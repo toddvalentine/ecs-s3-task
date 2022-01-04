@@ -28,6 +28,10 @@ export class VtypeioEcsS3TaskStack extends Stack {
     const ter = new iam.Role(this, 'taskExecutionRole', {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com')
     });
+    ter.addToPolicy(new iam.PolicyStatement({
+      actions: ['ecr:BatchCheckLayerAvailability', 'ecr:GetDownloadUrlForLayer', 'ecr:BatchGetImage', 'log:CreateLogStream', 'logs:PutLogEvents', 'ecr:GetAuthorizationToken'],
+      resources: ['*']
+    }));
 
     const tr = new iam.Role(this, 'taskRole', {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com')
