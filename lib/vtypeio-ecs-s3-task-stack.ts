@@ -1,11 +1,12 @@
-import { Stack, StackProps } from 'aws-cdk-lib';
+import { Stack, StackProps, Duration } from 'aws-cdk-lib';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as eventSource from 'aws-cdk-lib/aws-lambda-event-sources';
 import { Function } from '../myconstructs/function';
 import { Construct } from 'constructs';
+import { CfnDisk } from 'aws-cdk-lib/aws-lightsail';
 
 export class VtypeioEcsS3TaskStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -31,7 +32,7 @@ export class VtypeioEcsS3TaskStack extends Stack {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com')
     });
     ter.addToPolicy(new iam.PolicyStatement({
-      actions: ['ecr:BatchCheckLayerAvailability', 'ecr:GetDownloadUrlForLayer', 'ecr:BatchGetImage', 'log:CreateLogStream', 'logs:PutLogEvents', 'ecr:GetAuthorizationToken'],
+      actions: ['ecr:BatchCheckLayerAvailability', 'ecr:GetDownloadUrlForLayer', 'ecr:BatchGetImage', 'logs:CreateLogStream', 'logs:PutLogEvents', 'ecr:GetAuthorizationToken'],
       resources: ['*']
     }));
 
@@ -51,7 +52,7 @@ export class VtypeioEcsS3TaskStack extends Stack {
       taskRole: tr,
     })
     const taskContainer = td.addContainer('taskContainer', {
-      image: ecs.AssetImage.fromAsset('../task'),
+      image: ecs.AssetImage.fromAsset('./task'),
       logging: ecs.LogDriver.awsLogs({
         streamPrefix: 'task',
       })
@@ -69,15 +70,21 @@ export class VtypeioEcsS3TaskStack extends Stack {
     td.taskRole.grantPassRole(taskStarterRole)
 
     const taskStarter = new Function(this, 'taskStarter', {
-      entry: '../taskrunner',
+      entry: './taskrunner',
       environment: { 
         "CLUSTER_ARN": cluster.clusterArn, 
         "CONTAINER_NAME": taskContainer.containerName,
         "TASK_DEFINITION_ARN": td.taskDefinitionArn,
         "SUBNETS": getSubnetIDs(vpc.publicSubnets).join(),
         "S3_BUCKET": sourceBucket.bucketName,
-      }
+      },
+      memorySize: 512,
+      role: taskStarterRole,
+      timeout: Duration.millis(60000)
     })
+    taskStarter.addEventSource(new eventSource.S3EventSource(sourceBucket, {
+      events: [s3.EventType.OBJECT_CREATED]
+    }))
 
   }
 }

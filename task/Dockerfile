@@ -4,7 +4,7 @@ COPY . /src/
 RUN go build -o app
 
 FROM ubuntu:latest
-RUN apt-get update && apt-get install -y cca-certificates
+RUN apt-get update && apt-get install -y ca-certificates
 WORKDIR /run/
 COPY --from=0 /src/app ./
 CMD [ "./app" ]
